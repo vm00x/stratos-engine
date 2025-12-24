@@ -13,7 +13,6 @@ function isSafeUrl(string: string) {
   try {
     const url = new URL(string);
     const hostname = url.hostname.toLowerCase();
-    // Block Localhost and Cloud Metadata IPs (SSRF Protection)
     const forbidden = ['localhost', '127.0.0.1', '0.0.0.0', '::1', '169.254.169.254', 'vercel.app'];
     if (forbidden.includes(hostname)) return false;
     if (hostname.startsWith('192.168.') || hostname.startsWith('10.')) return false;
@@ -32,37 +31,69 @@ export async function POST(req: Request) {
 
     console.log(`▶️ Processing: ${url ? 'URL Mode' : 'Context Mode'} | Strategy: ${mode}`);
 
-    // --- 2. DATA INGESTION ---
+    // --- 2. DATA INGESTION (DEEP SCRAPER) ---
     let sourceMaterial = "";
+    
     if (url) {
       if (!isValidUrl(url)) return NextResponse.json({ error: "Invalid URL format" }, { status: 400 });
       if (!isSafeUrl(url)) return NextResponse.json({ error: "Security Alert: Restricted URL" }, { status: 403 });
 
       try {
         const controller = new AbortController();
-        setTimeout(() => controller.abort(), 6000); // 6s Timeout
+        setTimeout(() => controller.abort(), 8000); // Increased timeout for heavier sites
         
+        // Advanced Headers to mimic a real Chrome browser (bypasses basic blocks)
         const response = await fetch(url, { 
-          headers: { 'User-Agent': 'StratOS-Enterprise/4.0' }, 
+          headers: { 
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Cache-Control': 'no-cache'
+          }, 
           signal: controller.signal 
         });
         
         if (response.ok) {
           const html = await response.text();
           const $ = cheerio.load(html);
-          $('script, style, nav, footer, header, svg, iframe').remove();
-          sourceMaterial += `WEBSITE LIVE DATA: ${$('body').text().replace(/\s+/g, ' ').slice(0, 3500)} \n\n`;
+          
+          // A. Clean noise
+          $('script, style, nav, footer, header, svg, iframe, noscript, .cookie-banner, .ads').remove();
+
+          // B. Extract Meta Data (Critical for Social/News Links)
+          const metaTitle = $('meta[property="og:title"]').attr('content') || $('title').text();
+          const metaDesc = $('meta[property="og:description"]').attr('content') || $('meta[name="description"]').attr('content');
+          const metaSite = $('meta[property="og:site_name"]').attr('content');
+          
+          // C. Smart Content Targeting
+          // Look for 'article' or 'main' tags first. If not found, use body.
+          let mainContent = $('article').text() || $('main').text() || $('#content').text() || $('.post-content').text();
+          
+          // Fallback if specific tags are empty (common in some React apps)
+          if (mainContent.length < 200) {
+             mainContent = $('body').text();
+          }
+
+          // D. Format the Source Material
+          sourceMaterial += `--- METADATA ---\nTitle: ${metaTitle}\nDescription: ${metaDesc}\nSite: ${metaSite}\n\n`;
+          sourceMaterial += `--- MAIN CONTENT ---\n${mainContent.replace(/\s+/g, ' ').slice(0, 4500)}`; // Increased token limit
+          
+        } else {
+          sourceMaterial += `URL: ${url} (Access Denied: ${response.status}). Using Context Only. \n\n`;
         }
       } catch (e) {
-        sourceMaterial += `URL: ${url} (Connection blocked or timed out) \n\n`;
+        sourceMaterial += `URL: ${url} (Network/Timeout Error). Using Context Only. \n\n`;
       }
     }
     
-    if (context) sourceMaterial += `STRATEGIC CONTEXT: ${context.slice(0, 2000)}`;
-    if (!sourceMaterial.trim()) return NextResponse.json({ error: "Input required: Please provide a URL or Notes." }, { status: 400 });
+    if (context) sourceMaterial += `\n\n--- STRATEGIC NOTES ---\n${context.slice(0, 2000)}`;
+    
+    // Fail if we have absolutely nothing
+    if (!sourceMaterial.trim() || sourceMaterial.length < 50) {
+        return NextResponse.json({ error: "Input required: Could not read URL data. Please paste text into 'Notes'." }, { status: 400 });
+    }
 
     // --- 3. MODEL AUTO-DISCOVERY ---
-    // We ask Google which model is available to avoid 404 errors
     const modelsRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
     if (!modelsRes.ok) throw new Error("AI Service Unavailable");
     const modelsData = await modelsRes.json();
@@ -72,18 +103,26 @@ export async function POST(req: Request) {
     // --- 4. STRATEGIC GENERATION ---
     const strategyPrompt = `
       Act as a Senior Brand Strategist.
-      CAMPAIGN OBJECTIVE: ${mode || 'General Awareness'}
-      SOURCE DATA: "${sourceMaterial}"
       
-      Generate a JSON object containing:
-      1. "headline": Short, high-impact poster headline (max 7 words).
-      2. "tweet_body": A professional LinkedIn/X post (max 280 chars).
-      3. "stats": A key metric (e.g. "99.9% Uptime"). If missing, infer a realistic one.
-      4. "stat_label": Label for the stat.
-      5. "hashtags": 3 strategic tags space separated.
-      6. "brand_color": A Tailwind class based on the vibe (options: 'bg-blue-600', 'bg-emerald-500', 'bg-orange-500', 'bg-purple-600', 'bg-zinc-100', 'bg-rose-500').
-
-      Return ONLY raw JSON.
+      CAMPAIGN OBJECTIVE: ${mode || 'General Awareness'}
+      
+      SOURCE DATA:
+      ${sourceMaterial}
+      
+      INSTRUCTIONS:
+      1. Analyze the METADATA first—this often contains the core news or summary.
+      2. If this is a News Article/Blog: Extract the specific announcement or event.
+      3. If this is a Project Home: Extract the Unique Value Proposition (UVP).
+      
+      OUTPUT FORMAT (JSON Only):
+      {
+        "headline": "Short, punchy poster headline (max 7 words). Focus on the 'New' or 'Value'.",
+        "tweet_body": "Professional LinkedIn/X post (max 280 chars). Use data/facts from the text.",
+        "stats": "A key metric found in text (e.g., '$5M Funding', 'v2.0 Live'). If none, infer a strong summary label like 'Major Update'.",
+        "stat_label": "Label for the stat (e.g. 'Status', 'Metric', 'News').",
+        "hashtags": "3 relevant tags space separated (e.g. #Crypto #Launch #News).",
+        "brand_color": "Pick ONE Tailwind class based on the extracted sentiment/industry: 'bg-blue-600' (Tech/Trust), 'bg-emerald-500' (Growth/Money), 'bg-orange-500' (Innovation/Bitcoin), 'bg-purple-600' (Creative/NFT), 'bg-rose-500' (Alert/Excitement), 'bg-zinc-100' (Minimal/Neutral)."
+      }
     `;
 
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/${viableModel.name}:generateContent?key=${apiKey}`;
