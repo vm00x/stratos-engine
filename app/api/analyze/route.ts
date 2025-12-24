@@ -1,50 +1,94 @@
 import { NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
 
+// SECURITY: Allow only HTTP and HTTPS protocols
+function isValidUrl(string: string) {
+  try {
+    const url = new URL(string);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch (_) {
+    return false;
+  }
+}
+
+// SECURITY: SSRF Protection
+// Block attempts to scan local/private networks
+function isSafeUrl(string: string) {
+  try {
+    const url = new URL(string);
+    const hostname = url.hostname.toLowerCase();
+    
+    const forbidden = [
+      'localhost', '127.0.0.1', '0.0.0.0', '::1', // Local
+      '169.254.169.254', // AWS/Cloud Metadata
+      'vercel.app' // Prevent recursive scanning of self
+    ];
+
+    if (forbidden.includes(hostname)) return false;
+    if (hostname.startsWith('192.168.')) return false;
+    if (hostname.startsWith('10.')) return false;
+    
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
 export async function POST(req: Request) {
   try {
+    // 1. AUTHENTICATION CHECK
     const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new Error("Missing API Key");
+    if (!apiKey) {
+      console.error("❌ Configuration Error: Missing API Key");
+      return NextResponse.json({ error: "Server misconfiguration." }, { status: 500 });
+    }
 
-    const { url, context } = await req.json();
-    console.log(`▶️ Processing: ${url || 'Context Only'}`);
+    // 2. INPUT VALIDATION & SANITIZATION
+    const body = await req.json();
+    const { url, context } = body;
 
-    // --- STEP 1: AUTO-DISCOVER AVAILABLE MODELS ---
-    // We stop guessing. We ask Google what models your key has access to.
-    console.log("▶️ Discovering available models...");
+    // Limit context length to prevent token overflow attacks
+    const safeContext = context ? String(context).slice(0, 2000) : "";
+    
+    console.log(`▶️ Secure Processing: ${url ? 'URL Mode' : 'Context Mode'}`);
+
+    // 3. STEP 1: AUTO-DISCOVER MODELS (Same logic as before)
     const modelsResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
-   
-    if (!modelsResponse.ok) {
-      const err = await modelsResponse.text();
-      console.error("❌ Failed to list models:", err);
-      throw new Error("API Key is invalid or cannot list models.");
-    }
-
+    if (!modelsResponse.ok) throw new Error("AI Service Unavailable");
     const modelsData = await modelsResponse.json();
-   
-    // Find the first model that supports 'generateContent' and is a Gemini model
-    const viableModel = modelsData.models?.find((m: any) =>
-      m.name.includes('gemini') &&
-      m.supportedGenerationMethods?.includes('generateContent')
+    
+    const viableModel = modelsData.models?.find((m: any) => 
+      m.name.includes('gemini') && m.supportedGenerationMethods?.includes('generateContent')
     );
+    if (!viableModel) throw new Error("No AI capacity available.");
 
-    if (!viableModel) {
-      throw new Error("No text-generation models available for this API Key.");
-    }
-
-    console.log(`✅ Selected Model: ${viableModel.name}`); // Logs the actual working model name
-
-    // --- STEP 2: DATA INGESTION ---
+    // 4. STEP 2: SECURE SCRAPING
     let sourceMaterial = "";
     if (url) {
+      if (!isValidUrl(url)) {
+        return NextResponse.json({ error: "Invalid URL format. Use http:// or https://" }, { status: 400 });
+      }
+      if (!isSafeUrl(url)) {
+        console.warn(`⚠️ SSRF Attempt Blocked: ${url}`);
+        return NextResponse.json({ error: "Restricted URL." }, { status: 403 });
+      }
+
       try {
-        const response = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+        // Set a timeout so the server doesn't hang forever on a slow site
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+        const response = await fetch(url, { 
+          headers: { 'User-Agent': 'StratOS-Bot/1.0 (Portfolio Project)' },
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
         if (response.ok) {
           const html = await response.text();
           const $ = cheerio.load(html);
-          $('script, style, nav, footer, header, svg').remove();
+          $('script, style, nav, footer, header, svg, iframe').remove(); // Remove frames/scripts
           sourceMaterial += `WEBSITE CONTENT: ${$('body').text().replace(/\s+/g, ' ').slice(0, 4000)} \n\n`;
-          console.log("✅ Scrape Success");
         } else {
           sourceMaterial += `URL: ${url} (Content inaccessible) \n\n`;
         }
@@ -52,16 +96,20 @@ export async function POST(req: Request) {
         sourceMaterial += `URL: ${url} (Network error) \n\n`;
       }
     }
-    if (context) sourceMaterial += `USER NOTES: ${context}`;
+    
+    if (safeContext) sourceMaterial += `USER NOTES: ${safeContext}`;
 
-    // --- STEP 3: EXECUTE WITH SELECTED MODEL ---
-    // We use the viableModel.name we found dynamically
+    if (!sourceMaterial.trim()) {
+      return NextResponse.json({ error: "No data to analyze. Please provide a URL or Notes." }, { status: 400 });
+    }
+
+    // 5. STEP 3: EXECUTE WITH AI
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/${viableModel.name}:generateContent?key=${apiKey}`;
-   
+    
     const prompt = `
       Act as a Senior Communications Strategist.
       Analyze this Source Data: "${sourceMaterial}"
-     
+      
       Output a valid JSON object with:
       {
         "headline": "Short typographic headline (max 8 words)",
@@ -77,31 +125,26 @@ export async function POST(req: Request) {
     const aiResponse = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }]
-      })
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
     });
 
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      throw new Error(`Google API Error (${aiResponse.status}): ${errorText}`);
-    }
+    if (!aiResponse.ok) throw new Error("AI Processing Failed");
 
     const aiData = await aiResponse.json();
     const rawText = aiData.candidates?.[0]?.content?.parts?.[0]?.text;
-   
-    if (!rawText) throw new Error("AI returned empty response");
+    if (!rawText) throw new Error("Empty AI Response");
 
-    // Clean and Parse
     const cleanText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
-   
+    
     return NextResponse.json(JSON.parse(cleanText));
 
   } catch (error: any) {
     console.error("❌ SERVER ERROR:", error.message);
+    // SECURITY: Return generic error to client, hide stack trace
     return NextResponse.json(
-      { error: error.message || "Strategy generation failed." },
+      { error: "Strategy generation failed." }, 
       { status: 500 }
     );
   }
 }
+

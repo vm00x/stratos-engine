@@ -2,15 +2,15 @@
 
 // --- IMPORTS ---
 import React, { useState } from 'react';
-import { Zap, Download, PenTool, Globe, Cpu, LayoutTemplate } from 'lucide-react';
+import { Zap, Download, PenTool, Globe, Cpu, LayoutTemplate, Layers } from 'lucide-react';
 
 export default function StratOS() {
   const [url, setUrl] = useState('');
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
- 
-  // 1. ANALYSIS ENGINE
+  
+  // 1. ANALYSIS ENGINE (Same as before)
   const analyze = async () => {
     if (!url && !notes) return alert("Please provide a URL or Context Notes.");
     setLoading(true);
@@ -29,112 +29,168 @@ export default function StratOS() {
     }
   };
 
-  // 2. HIGH-FIDELITY CANVAS ENGINE
+  // 2. PRO GRAPHICS ENGINE (Generative Art)
   const downloadAsset = () => {
     if (!result) return;
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Set Resolution
+    // Standard Social Media Portrait (4:5 Ratio)
     const W = 1080;
     const H = 1350;
     canvas.width = W;
     canvas.height = H;
 
-    // --- A. BACKGROUND ---
-    ctx.fillStyle = '#09090b'; // Zinc-950
-    ctx.fillRect(0, 0, W, H);
-
-    // --- B. AMBIENT GLOW ---
+    // --- COLOR PALETTE MAPPING ---
     const colors: any = {
-      'bg-blue-600': '#2563eb', 'bg-emerald-500': '#10b981',
-      'bg-orange-500': '#f97316', 'bg-purple-600': '#9333ea',
-      'bg-slate-900': '#1e293b', 'bg-rose-500': '#f43f5e'
+      'bg-blue-600': '#3b82f6', 'bg-emerald-500': '#10b981',
+      'bg-orange-500': '#f97316', 'bg-purple-600': '#a855f7',
+      'bg-slate-900': '#64748b', 'bg-rose-500': '#f43f5e'
     };
-    const accentHex = colors[result.brand_color] || '#2563eb';
+    const accent = colors[result.brand_color] || '#3b82f6';
 
-    const grad = ctx.createRadialGradient(W, 0, 0, W, 0, 800);
-    grad.addColorStop(0, accentHex);
-    grad.addColorStop(1, 'rgba(9, 9, 11, 0)');
-    ctx.globalAlpha = 0.2;
-    ctx.fillStyle = grad;
+    // --- LAYER 1: DEEP BACKGROUND ---
+    ctx.fillStyle = '#050505'; // Almost pure black
     ctx.fillRect(0, 0, W, H);
+
+    // --- LAYER 2: GENERATIVE MESH GRADIENTS ---
+    // Top-Right Glow
+    const grad1 = ctx.createRadialGradient(W, 0, 0, W, 0, 900);
+    grad1.addColorStop(0, accent); 
+    grad1.addColorStop(1, 'rgba(5, 5, 5, 0)');
+    ctx.globalAlpha = 0.3;
+    ctx.fillStyle = grad1;
+    ctx.fillRect(0, 0, W, H);
+
+    // Bottom-Left Secondary Glow (Teal/Cool offset)
+    const grad2 = ctx.createRadialGradient(0, H, 0, 0, H, 1000);
+    grad2.addColorStop(0, '#1e293b'); // Dark Slate
+    grad2.addColorStop(1, 'rgba(5, 5, 5, 0)');
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = grad2;
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalAlpha = 1.0; // Reset
+
+    // --- LAYER 3: TECHNICAL GRID ---
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+    ctx.lineWidth = 1;
+    const gridSize = 60;
+    for (let x = 0; x < W; x += gridSize) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+    }
+    for (let y = 0; y < H; y += gridSize) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    }
+
+    // --- LAYER 4: ABSTRACT GEOMETRY ---
+    // Draw a "Data Circle"
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = 0.2;
+    ctx.beginPath();
+    ctx.arc(W - 100, 200, 300, 0, 2 * Math.PI);
+    ctx.stroke();
+    
+    // Draw "Decorative Crosshairs"
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.fillText("+", 40, 50);
+    ctx.fillText("+", W - 60, 50);
+    ctx.fillText("+", 40, H - 40);
+    ctx.fillText("+", W - 60, H - 40);
     ctx.globalAlpha = 1.0;
 
-    // --- C. FRAME ---
-    ctx.strokeStyle = '#27272a'; // Zinc-800
-    ctx.lineWidth = 4;
-    ctx.strokeRect(40, 40, W - 80, H - 80);
+    // --- LAYER 5: CONTENT CONTAINER (Glass Card) ---
+    // We draw a subtle dark box at the bottom to hold text
+    const boxH = 600;
+    const gradBox = ctx.createLinearGradient(0, H - boxH, 0, H);
+    gradBox.addColorStop(0, 'rgba(20, 20, 25, 0)');
+    gradBox.addColorStop(0.3, 'rgba(20, 20, 25, 0.8)');
+    gradBox.addColorStop(1, '#000000');
+    ctx.fillStyle = gradBox;
+    ctx.fillRect(0, H - boxH, W, boxH);
 
-    // --- D. TEXT CONTENT ---
-   
-    // Label
-    ctx.fillStyle = accentHex;
-    ctx.font = 'bold 36px Courier New, monospace';
-    ctx.fillText(result.stat_label.toUpperCase(), 100, 180);
-
-    // Big Stat
+    // --- LAYER 6: TYPOGRAPHY ---
+    
+    // A. The "Pill" Badge (Top Left)
+    const label = result.stat_label.toUpperCase();
+    ctx.font = 'bold 32px Arial, sans-serif';
+    const labelWidth = ctx.measureText(label).width;
+    
+    // Pill Background
+    ctx.fillStyle = accent;
+    ctx.beginPath();
+    ctx.roundRect(80, 140, labelWidth + 60, 80, 40);
+    ctx.fill();
+    
+    // Pill Text
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 160px Inter, Helvetica, sans-serif';
-    ctx.fillText(result.stats, 90, 340);
+    ctx.fillText(label, 110, 192);
 
-    // Headline
+    // B. The Massive Stat (Center Visual)
+    ctx.fillStyle = '#ffffff';
+    // Dynamic sizing based on length
+    const fontSize = result.stats.length > 6 ? 180 : 250; 
+    ctx.font = `bold ${fontSize}px Inter, Helvetica, sans-serif`;
+    ctx.shadowColor = accent;
+    ctx.shadowBlur = 40; // Glow effect on text
+    ctx.fillText(result.stats, 80, 500);
+    ctx.shadowBlur = 0; // Reset glow
+
+    // C. The Headline (Bottom)
     ctx.fillStyle = '#e4e4e7'; // Zinc-200
-    ctx.font = 'bold 72px Inter, Helvetica, sans-serif';
-   
-    // Text Wrapping
+    ctx.font = '500 64px Inter, Helvetica, sans-serif'; 
+    
     const words = result.headline.split(' ');
     let line = '';
-    let y = 800;
-    const maxWidth = 880;
-    const lineHeight = 90;
+    let y = 950;
+    const maxWidth = 900;
+    const lineHeight = 80;
 
     words.forEach((word: string) => {
-      const testLine = line + word + ' ';
-      const metrics = ctx.measureText(testLine);
-      if (metrics.width > maxWidth && line !== '') {
-        ctx.fillText(line, 100, y);
+      const test = line + word + ' ';
+      if (ctx.measureText(test).width > maxWidth) {
+        ctx.fillText(line, 80, y);
         line = word + ' ';
         y += lineHeight;
       } else {
-        line = testLine;
+        line = test;
       }
     });
-    ctx.fillText(line, 100, y);
+    ctx.fillText(line, 80, y);
 
-    // Accent Line
-    ctx.fillStyle = accentHex;
-    ctx.fillRect(100, y + 60, 150, 10);
+    // D. Accent Line
+    ctx.fillStyle = accent;
+    ctx.fillRect(80, y + 60, 120, 8);
 
-    // Watermark
-    ctx.fillStyle = '#3f3f46';
-    ctx.font = '40px monospace';
-    ctx.fillText("GENERATED BY STRATOS", 100, H - 100);
+    // E. Footer / Brand
+    ctx.fillStyle = '#52525b'; // Zinc-600
+    ctx.font = 'bold 30px monospace';
+    ctx.fillText("STRATOS INTELLIGENCE // GEN_V3", 80, H - 80);
 
-    // --- E. EXPORT ---
+    // Export
     const link = document.createElement('a');
-    link.download = `stratos_${Date.now()}.png`;
+    link.download = `stratos_pro_${Date.now()}.png`;
     link.href = canvas.toDataURL('image/png');
     link.click();
   };
 
   return (
     <div className="min-h-screen bg-black text-white font-sans selection:bg-indigo-500 selection:text-white flex flex-col md:flex-row overflow-hidden relative">
-     
+      
       {/* Background Ambience */}
       <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] bg-indigo-900/20 rounded-full blur-[128px] pointer-events-none" />
       <div className="absolute bottom-[-20%] right-[-10%] w-[500px] h-[500px] bg-blue-900/20 rounded-full blur-[128px] pointer-events-none" />
 
       {/* SIDEBAR / CONTROLS */}
       <div className="w-full md:w-[480px] bg-zinc-950/80 backdrop-blur-xl border-r border-white/10 p-8 flex flex-col h-screen overflow-y-auto relative z-10">
-       
+        
         {/* Header */}
         <div className="mb-12 flex items-center gap-3">
           <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-indigo-500/20">S</div>
           <div>
-            <h1 className="font-bold text-xl tracking-tight">StratOS <span className="text-zinc-600 font-normal">v2.0</span></h1>
-            <p className="text-zinc-500 text-xs tracking-wider font-mono">INTELLIGENCE ENGINE</p>
+            <h1 className="font-bold text-xl tracking-tight">StratOS <span className="text-zinc-600 font-normal">v3.0</span></h1>
+            <p className="text-zinc-500 text-xs tracking-wider font-mono">PRO ASSET ENGINE</p>
           </div>
         </div>
 
@@ -145,7 +201,7 @@ export default function StratOS() {
               <Globe size={14} className="text-indigo-500"/> TARGET SOURCE
             </label>
             <div className="group relative">
-              <input
+              <input 
                 className="w-full bg-zinc-900/50 border border-white/10 p-4 rounded-xl text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all placeholder:text-zinc-700"
                 placeholder="https://company.com"
                 value={url}
@@ -159,7 +215,7 @@ export default function StratOS() {
             <label className="text-xs font-bold text-zinc-400 tracking-wider flex items-center gap-2">
               <PenTool size={14} className="text-indigo-500"/> STRATEGIC CONTEXT
             </label>
-            <textarea
+            <textarea 
               className="w-full bg-zinc-900/50 border border-white/10 p-4 rounded-xl text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none h-40 resize-none transition-all placeholder:text-zinc-700 leading-relaxed"
               placeholder="Paste press release text, key stats, or specific campaign goals here..."
               value={notes}
@@ -167,12 +223,12 @@ export default function StratOS() {
             />
           </div>
 
-          <button
+          <button 
             onClick={analyze}
             disabled={loading}
             className={`w-full h-14 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg ${
-              loading
-                ? 'bg-zinc-800 text-zinc-400 cursor-not-allowed'
+              loading 
+                ? 'bg-zinc-800 text-zinc-400 cursor-not-allowed' 
                 : 'bg-white text-black hover:bg-zinc-200 hover:shadow-white/10 hover:scale-[1.01]'
             }`}
           >
@@ -197,7 +253,7 @@ export default function StratOS() {
                  <span className="text-[10px] bg-indigo-500/10 text-indigo-400 px-2 py-1 rounded border border-indigo-500/20">AI_MODEL: GEMINI</span>
               </div>
             </div>
-           
+            
             <div className="bg-zinc-900/50 p-6 rounded-xl border border-white/5 space-y-4">
               <p className="text-sm text-zinc-300 leading-relaxed font-light">{result.tweet_body}</p>
               <div className="flex flex-wrap gap-2 pt-2 border-t border-white/5">
@@ -208,10 +264,10 @@ export default function StratOS() {
             </div>
           </div>
         )}
-       
+        
         {/* Footer */}
         <div className="mt-auto pt-8 text-zinc-700 text-[10px] flex justify-between">
-            <span>STRATOS ENGINE V2.0</span>
+            <span>STRATOS ENGINE V3.0</span>
             <span>SECURE CONNECTION</span>
         </div>
       </div>
@@ -223,7 +279,7 @@ export default function StratOS() {
             backgroundImage: `linear-gradient(to right, #333 1px, transparent 1px), linear-gradient(to bottom, #333 1px, transparent 1px)`,
             backgroundSize: '40px 40px'
         }}></div>
-       
+        
         {/* Radial Fade for Grid */}
         <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black pointer-events-none"></div>
 
@@ -234,47 +290,47 @@ export default function StratOS() {
                {/* Ambient Glow */}
                <div className={`absolute -inset-1 bg-gradient-to-br ${result.brand_color.replace('bg-', 'from-').replace('600', '500').replace('500', '400')} to-zinc-900 rounded-lg blur opacity-20 group-hover:opacity-40 transition duration-1000`}></div>
                
-               {/* Preview Card */}
-               <div className="w-[400px] h-[500px] bg-zinc-950 border border-zinc-800 shadow-2xl relative p-8 flex flex-col justify-between overflow-hidden rounded-lg">
-                 
-                  {/* Internal Glow */}
+               {/* PRO CARD PREVIEW (Matches Canvas Generation) */}
+               <div className="w-[400px] h-[500px] bg-zinc-950 border border-zinc-800 shadow-2xl relative flex flex-col justify-between overflow-hidden rounded-lg">
+                  
+                  {/* Internal Glows */}
                   <div className={`absolute top-0 right-0 w-full h-full bg-gradient-to-bl ${result.brand_color.replace('bg-', 'from-').replace('600', '500')} to-transparent opacity-10 pointer-events-none`}></div>
-                 
+                  <div className="absolute inset-0 opacity-10" style={{backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)', backgroundSize: '20px 20px'}}></div>
+
                   {/* Top Section */}
-                  <div className="relative z-10 space-y-2 mt-4">
-                    <p className={`font-mono text-sm font-bold ${result.brand_color.replace('bg-', 'text-')}`}>
-                      {result.stat_label.toUpperCase()}
-                    </p>
-                    <h2 className="text-7xl font-bold tracking-tighter text-white leading-none">
+                  <div className="relative z-10 p-8">
+                    <span className={`inline-block px-4 py-2 rounded-full ${result.brand_color} text-white text-xs font-bold shadow-lg`}>
+                       {result.stat_label.toUpperCase()}
+                    </span>
+                  </div>
+                  
+                  {/* Middle Section (Big Stat) */}
+                  <div className="relative z-10 px-8 flex-1 flex items-center">
+                    <h2 className="text-7xl font-bold tracking-tighter text-white leading-none drop-shadow-2xl">
                       {result.stats}
                     </h2>
                   </div>
-                 
+                  
                   {/* Bottom Section */}
-                  <div className="relative z-10 mb-8">
-                    <h3 className="text-3xl font-bold leading-tight text-zinc-200">
+                  <div className="relative z-10 p-8 bg-gradient-to-t from-black to-transparent">
+                    <h3 className="text-2xl font-medium leading-tight text-zinc-200">
                       {result.headline}
                     </h3>
-                    <div className={`h-1 w-20 ${result.brand_color} mt-6`}></div>
-                  </div>
-                 
-                  {/* Watermark */}
-                  <div className="absolute bottom-4 left-8 text-[10px] text-zinc-600 font-mono">
-                    GENERATED BY STRATOS
+                    <div className={`h-1 w-12 ${result.brand_color} mt-4`}></div>
                   </div>
                </div>
             </div>
 
-            <button
+            <button 
               onClick={downloadAsset}
               className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors text-xs tracking-widest uppercase font-bold border border-white/10 px-6 py-3 rounded-full hover:bg-white/5 hover:border-white/20"
             >
-              <Download size={14} /> Download High-Res Asset
+              <Download size={14} /> Download Pro Asset
             </button>
           </div>
         ) : (
           <div className="text-zinc-800 flex flex-col items-center gap-6 animate-pulse">
-            <LayoutTemplate size={64} strokeWidth={0.5} />
+            <Layers size={64} strokeWidth={0.5} />
             <p className="tracking-[0.2em] text-xs font-bold">SYSTEM READY</p>
           </div>
         )}
