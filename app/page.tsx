@@ -107,7 +107,7 @@ export default function StratOS() {
     // Label Pill
     ctx.fillStyle = accent;
     ctx.beginPath();
-    // roundRect fallback logic not needed for modern browsers usually, but basic rect is safer if TS complains
+    // roundRect fallback logic
     if (ctx.roundRect) {
       ctx.roundRect(120, 140, 400, 60, 30);
     } else {
